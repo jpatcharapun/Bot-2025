@@ -34,18 +34,16 @@ load_dotenv()
 API_KEY = os.getenv("BITKUB_API_KEY")
 API_SECRET = os.getenv("BITKUB_API_SECRET")
 API_URL = "https://api.bitkub.com"
-DATABASE_URL = "postgresql+psycopg2://avnadmin:AVNS_oPaFDXYBP38oGD4KIm2@bottoei-bottoei.e.aivencloud.com:13006/defaultdb"
+DATABASE_URL =  os.getenv("DB_CONNECTION")
 engine = create_engine(DATABASE_URL)
+# Retrieve database credentials from environment variables
 
-DB_CONNECTION = psycopg2.connect(
-        host="bottoei-bottoei.e.aivencloud.com",
-        port=13006,
-        dbname="defaultdb",
-        user="avnadmin",
-        password="AVNS_oPaFDXYBP38oGD4KIm2",
-        sslmode="require"
-    )
-
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
+DB_NAME = os.getenv("DB_NAME")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_SSLMODE = os.getenv("DB_SSLMODE")
 
 # ดึงรายการ Asset จาก Bitkub API
 def fetch_assets_from_bitkub():
@@ -351,22 +349,15 @@ def get_latest_buy_order(symbol):
 
 # ฟังก์ชันสำหรับสร้างฐานข้อมูลและตาราง Log
 def initialize_database():
-    # # conn = psycopg2.connect(
-    #     host="bottoei-bottoei.e.aivencloud.com",
-    #     port=13006,
-    #     dbname="defaultdb",
-    #     user="avnadmin",
-    #     password="AVNS_oPaFDXYBP38oGD4KIm2",
-    #     sslmode="require"
-    # )  # ชื่อไฟล์ฐานข้อมูล
+   
     conn = psycopg2.connect(
-        host="bottoei-bottoei.e.aivencloud.com",
-        port=13006,
-        dbname="defaultdb",
-        user="avnadmin",
-        password="AVNS_oPaFDXYBP38oGD4KIm2",
-        sslmode="require"
-    )
+                host=DB_HOST,
+                port=DB_PORT,
+                dbname=DB_NAME,
+                user=DB_USER,
+                password=DB_PASSWORD,
+                sslmode=DB_SSLMODE
+            )
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS logs (
@@ -406,31 +397,17 @@ def initialize_database():
     cursor.close()
     conn.close()
 
-# ฟังก์ชันสำหรับบันทึกข้อความ Log
-# def save_log(symbol, message):
-#     print(message)
-#     conn = psycopg2.connect(
-    #     host="bottoei-bottoei.e.aivencloud.com",
-    #     port=13006,
-    #     dbname="defaultdb",
-    #     user="avnadmin",
-    #     password="AVNS_oPaFDXYBP38oGD4KIm2",
-    #     sslmode="require"
-    # )
-#     cursor = conn.cursor()
-#     cursor.execute("INSERT INTO logs (symbol, message) VALUES (%s, %s)", (symbol, message))
-#     conn.commit()
-#     conn.close()
+
 def save_log(symbol, message):
     try:
         conn = psycopg2.connect(
-        host="bottoei-bottoei.e.aivencloud.com",
-        port=13006,
-        dbname="defaultdb",
-        user="avnadmin",
-        password="AVNS_oPaFDXYBP38oGD4KIm2",
-        sslmode="require"
-    )
+                host=DB_HOST,
+                port=DB_PORT,
+                dbname=DB_NAME,
+                user=DB_USER,
+                password=DB_PASSWORD,
+                sslmode=DB_SSLMODE
+            )
         cursor = conn.cursor()
         
         cursor.execute("INSERT INTO logs (symbol, message) VALUES (%s, %s)", (symbol, message))
@@ -450,13 +427,13 @@ def save_order_log(symbol, order_type, amount, rate, status):
     try:
         """บันทึก log การวางคำสั่ง Order ลง SQLite"""
         conn = psycopg2.connect(
-            host="bottoei-bottoei.e.aivencloud.com",
-            port=13006,
-            dbname="defaultdb",
-            user="avnadmin",
-            password="AVNS_oPaFDXYBP38oGD4KIm2",
-            sslmode="require"
-        )
+                host=DB_HOST,
+                port=DB_PORT,
+                dbname=DB_NAME,
+                user=DB_USER,
+                password=DB_PASSWORD,
+                sslmode=DB_SSLMODE
+            )
         cursor = conn.cursor()
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS order_logs (
@@ -481,13 +458,13 @@ def save_order_log(symbol, order_type, amount, rate, status):
 def save_cancel_order_log(symbol, order_id, side, status):
     """บันทึก log การยกเลิกคำสั่งลง SQLite"""
     conn = psycopg2.connect(
-        host="bottoei-bottoei.e.aivencloud.com",
-        port=13006,
-        dbname="defaultdb",
-        user="avnadmin",
-        password="AVNS_oPaFDXYBP38oGD4KIm2",
-        sslmode="require"
-    )
+                host=DB_HOST,
+                port=DB_PORT,
+                dbname=DB_NAME,
+                user=DB_USER,
+                password=DB_PASSWORD,
+                sslmode=DB_SSLMODE
+            )
     cursor = conn.cursor()
     # Create the table if it does not exist
     cursor.execute("""
@@ -518,13 +495,13 @@ def save_trade_record(symbol, order_type, profit_loss):
     บันทึกข้อมูลกำไร/ขาดทุนลงในตาราง trade_records
     """
     conn = psycopg2.connect(
-        host="bottoei-bottoei.e.aivencloud.com",
-        port=13006,
-        dbname="defaultdb",
-        user="avnadmin",
-        password="AVNS_oPaFDXYBP38oGD4KIm2",
-        sslmode="require"
-    )
+                host=DB_HOST,
+                port=DB_PORT,
+                dbname=DB_NAME,
+                user=DB_USER,
+                password=DB_PASSWORD,
+                sslmode=DB_SSLMODE
+            )
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS trade_records (
@@ -550,13 +527,13 @@ def save_rebalance_log_to_db(timestamp, asset, transaction_type, amount, price, 
     บันทึก Log ของ Rebalance ลง SQLite
     """
     conn = psycopg2.connect(
-        host="bottoei-bottoei.e.aivencloud.com",
-        port=13006,
-        dbname="defaultdb",
-        user="avnadmin",
-        password="AVNS_oPaFDXYBP38oGD4KIm2",
-        sslmode="require"
-    )
+                host=DB_HOST,
+                port=DB_PORT,
+                dbname=DB_NAME,
+                user=DB_USER,
+                password=DB_PASSWORD,
+                sslmode=DB_SSLMODE
+            )
     cursor = conn.cursor()
     cursor.execute("""
         INSERT INTO rebalance_logs (timestamp, asset, type, amount, price, potential_profit)
@@ -571,13 +548,13 @@ def calculate_overall_profit_loss():
     คำนวณกำไร/ขาดทุนรวมจากตาราง trade_records
     """
     conn = psycopg2.connect(
-        host="bottoei-bottoei.e.aivencloud.com",
-        port=13006,
-        dbname="defaultdb",
-        user="avnadmin",
-        password="AVNS_oPaFDXYBP38oGD4KIm2",
-        sslmode="require"
-    )
+                host=DB_HOST,
+                port=DB_PORT,
+                dbname=DB_NAME,
+                user=DB_USER,
+                password=DB_PASSWORD,
+                sslmode=DB_SSLMODE
+            )
     cursor = conn.cursor()
     cursor.execute("""
         SELECT SUM(profit_loss) FROM trade_records
@@ -839,11 +816,10 @@ def start_bot_async():
 # ฟังก์ชันหยุดบอท
 def stop_bot():
     if st.session_state.bot_process and st.session_state.bot_status == "Running":
-        st.session_state.bot_process.terminate()
-        st.session_state.bot_process.wait()
-        stop_flag.set()
+        # Signal the thread to stop
+        stop_flag.set()  # This is the flag used to control the thread loop
         st.session_state.bot_status = "Stopped"
-        st.session_state.bot_process = None
+        st.session_state.bot_process = None  # Clear the thread reference
         st.success("Bot stopped successfully!")
     else:
         st.warning("Bot is not running!")
@@ -966,13 +942,13 @@ def calculate_overall_profit_loss():
     """
     try:
         conn = psycopg2.connect(
-        host="bottoei-bottoei.e.aivencloud.com",
-        port=13006,
-        dbname="defaultdb",
-        user="avnadmin",
-        password="AVNS_oPaFDXYBP38oGD4KIm2",
-        sslmode="require"
-    )
+                host=DB_HOST,
+                port=DB_PORT,
+                dbname=DB_NAME,
+                user=DB_USER,
+                password=DB_PASSWORD,
+                sslmode=DB_SSLMODE
+            )
         cursor = conn.cursor()
         cursor.execute("""
             SELECT SUM(profit_loss) FROM trade_records
@@ -1076,13 +1052,13 @@ def fetch_open_orders():
 # ฟังก์ชันดึงข้อมูลจาก SQLite
 def fetch_trading_logs():
     conn = psycopg2.connect(
-        host="bottoei-bottoei.e.aivencloud.com",
-        port=13006,
-        dbname="defaultdb",
-        user="avnadmin",
-        password="AVNS_oPaFDXYBP38oGD4KIm2",
-        sslmode="require"
-    )
+                host=DB_HOST,
+                port=DB_PORT,
+                dbname=DB_NAME,
+                user=DB_USER,
+                password=DB_PASSWORD,
+                sslmode=DB_SSLMODE
+            )
     cursor = conn.cursor()
     cursor.execute("SELECT id, symbol, message, timestamp FROM logs ORDER BY timestamp DESC")
     rows = cursor.fetchall()
@@ -1091,13 +1067,13 @@ def fetch_trading_logs():
 
 def fetch_order_logs():
     conn = psycopg2.connect(
-        host="bottoei-bottoei.e.aivencloud.com",
-        port=13006,
-        dbname="defaultdb",
-        user="avnadmin",
-        password="AVNS_oPaFDXYBP38oGD4KIm2",
-        sslmode="require"
-    )
+                host=DB_HOST,
+                port=DB_PORT,
+                dbname=DB_NAME,
+                user=DB_USER,
+                password=DB_PASSWORD,
+                sslmode=DB_SSLMODE
+            )
     cursor = conn.cursor()
     cursor.execute("SELECT id, symbol, order_type, amount, rate, status, timestamp FROM order_logs ORDER BY timestamp DESC")
     rows = cursor.fetchall()
@@ -1106,13 +1082,13 @@ def fetch_order_logs():
 
 def fetch_cancel_order_logs():
     conn = psycopg2.connect(
-        host="bottoei-bottoei.e.aivencloud.com",
-        port=13006,
-        dbname="defaultdb",
-        user="avnadmin",
-        password="AVNS_oPaFDXYBP38oGD4KIm2",
-        sslmode="require"
-    )
+                host=DB_HOST,
+                port=DB_PORT,
+                dbname=DB_NAME,
+                user=DB_USER,
+                password=DB_PASSWORD,
+                sslmode=DB_SSLMODE
+            )
     cursor = conn.cursor()
     cursor.execute("SELECT id, symbol, order_id, side, status, timestamp FROM cancel_order_logs ORDER BY timestamp DESC")
     rows = cursor.fetchall()
