@@ -815,11 +815,10 @@ def start_bot_async():
 # ฟังก์ชันหยุดบอท
 def stop_bot():
     if st.session_state.bot_process and st.session_state.bot_status == "Running":
-        st.session_state.bot_process.terminate()
-        st.session_state.bot_process.wait()
-        stop_flag.set()
+        # Signal the thread to stop
+        stop_flag.set()  # This is the flag used to control the thread loop
         st.session_state.bot_status = "Stopped"
-        st.session_state.bot_process = None
+        st.session_state.bot_process = None  # Clear the thread reference
         st.success("Bot stopped successfully!")
     else:
         st.warning("Bot is not running!")
