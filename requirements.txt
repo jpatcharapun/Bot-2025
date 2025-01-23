@@ -53,7 +53,7 @@ protobuf==5.29.3
 psutil==6.1.1
 pyarrow==18.1.0
 PyAutoGUI==0.9.54
-psycopg2==2.9.10
+psycopg2-binary==2.9.10
 pydantic==2.8.2
 pydantic_core==2.20.1
 pydeck==0.9.1
