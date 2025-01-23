@@ -1,7 +1,7 @@
 from datetime import datetime
 import concurrent.futures
 import asyncio
-import sqlite3
+import psycopg2
 import streamlit as st
 import pandas as pd
 from st_aggrid import AgGrid, GridOptionsBuilder
@@ -10,7 +10,8 @@ import subprocess
 import time
 import psutil
 import plotly.express as px
-
+from psycopg2 import sql
+from sqlalchemy import create_engine
 import pytz
 import sys
 import numpy as np
@@ -23,7 +24,7 @@ import requests
 from dotenv import load_dotenv
 import os
 from decimal import Decimal
-import sqlite3
+import psycopg2
 from datetime import datetime
 import asyncio
 
@@ -33,6 +34,17 @@ load_dotenv()
 API_KEY = os.getenv("BITKUB_API_KEY")
 API_SECRET = os.getenv("BITKUB_API_SECRET")
 API_URL = "https://api.bitkub.com"
+DATABASE_URL = "postgresql+psycopg2://avnadmin:AVNS_oPaFDXYBP38oGD4KIm2@bottoei-bottoei.e.aivencloud.com:13006/defaultdb"
+engine = create_engine(DATABASE_URL)
+
+DB_CONNECTION = psycopg2.connect(
+        host="bottoei-bottoei.e.aivencloud.com",
+        port=13006,
+        dbname="defaultdb",
+        user="avnadmin",
+        password="AVNS_oPaFDXYBP38oGD4KIm2",
+        sslmode="require"
+    )
 
 
 # ดึงรายการ Asset จาก Bitkub API
@@ -339,29 +351,48 @@ def get_latest_buy_order(symbol):
 
 # ฟังก์ชันสำหรับสร้างฐานข้อมูลและตาราง Log
 def initialize_database():
-    conn = sqlite3.connect("trade_logs.db")  # ชื่อไฟล์ฐานข้อมูล
+    # # conn = psycopg2.connect(
+    #     host="bottoei-bottoei.e.aivencloud.com",
+    #     port=13006,
+    #     dbname="defaultdb",
+    #     user="avnadmin",
+    #     password="AVNS_oPaFDXYBP38oGD4KIm2",
+    #     sslmode="require"
+    # )  # ชื่อไฟล์ฐานข้อมูล
+    conn = psycopg2.connect(
+        host="bottoei-bottoei.e.aivencloud.com",
+        port=13006,
+        dbname="defaultdb",
+        user="avnadmin",
+        password="AVNS_oPaFDXYBP38oGD4KIm2",
+        sslmode="require"
+    )
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             symbol TEXT,
             message TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    # Create the `trade_records` table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS trade_records (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             symbol TEXT,
             order_type TEXT,
             profit_loss REAL,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    # Create the `rebalance_logs` table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS rebalance_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT,
+            id SERIAL PRIMARY KEY,
+            timestamp TIMESTAMP,
             asset TEXT,
             type TEXT,
             amount REAL,
@@ -370,80 +401,144 @@ def initialize_database():
         )
     """)
 
+    # Commit changes and close the connection
     conn.commit()
+    cursor.close()
     conn.close()
 
 # ฟังก์ชันสำหรับบันทึกข้อความ Log
+# def save_log(symbol, message):
+#     print(message)
+#     conn = psycopg2.connect(
+    #     host="bottoei-bottoei.e.aivencloud.com",
+    #     port=13006,
+    #     dbname="defaultdb",
+    #     user="avnadmin",
+    #     password="AVNS_oPaFDXYBP38oGD4KIm2",
+    #     sslmode="require"
+    # )
+#     cursor = conn.cursor()
+#     cursor.execute("INSERT INTO logs (symbol, message) VALUES (%s, %s)", (symbol, message))
+#     conn.commit()
+#     conn.close()
 def save_log(symbol, message):
-    print(message)
-    conn = sqlite3.connect("trade_logs.db")
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO logs (symbol, message) VALUES (?, ?)", (symbol, message))
-    conn.commit()
-    conn.close()
-    
-def save_order_log(symbol, order_type, amount, rate, status):
-    """บันทึก log การวางคำสั่ง Order ลง SQLite"""
-    conn = sqlite3.connect("trade_logs.db")
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS order_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            symbol TEXT,
-            order_type TEXT,
-            amount REAL,
-            rate REAL,
-            status TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    cursor.execute(
-        "INSERT INTO order_logs (symbol, order_type, amount, rate, status) VALUES (?, ?, ?, ?, ?)",
-        (symbol, order_type, amount, rate, status)
+    try:
+        conn = psycopg2.connect(
+        host="bottoei-bottoei.e.aivencloud.com",
+        port=13006,
+        dbname="defaultdb",
+        user="avnadmin",
+        password="AVNS_oPaFDXYBP38oGD4KIm2",
+        sslmode="require"
     )
-    conn.commit()
-    conn.close()
+        cursor = conn.cursor()
+        
+        cursor.execute("INSERT INTO logs (symbol, message) VALUES (%s, %s)", (symbol, message))
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except psycopg2.Error as e:
+        print(f"Error saving log: {e}")
+        if conn:
+            conn.rollback()  # Rollback the transaction to clear the error state
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+            
+def save_order_log(symbol, order_type, amount, rate, status):
+    try:
+        """บันทึก log การวางคำสั่ง Order ลง SQLite"""
+        conn = psycopg2.connect(
+            host="bottoei-bottoei.e.aivencloud.com",
+            port=13006,
+            dbname="defaultdb",
+            user="avnadmin",
+            password="AVNS_oPaFDXYBP38oGD4KIm2",
+            sslmode="require"
+        )
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS order_logs (
+                id SERIAL PRIMARY KEY,
+                symbol TEXT,
+                order_type TEXT,
+                amount REAL,
+                rate REAL,
+                status TEXT,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute(
+            "INSERT INTO order_logs (symbol, order_type, amount, rate, status) VALUES (%s, %s, %s, %s, %s)",
+            (symbol, order_type, amount, rate, status)
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Error : {e}")
     
 def save_cancel_order_log(symbol, order_id, side, status):
     """บันทึก log การยกเลิกคำสั่งลง SQLite"""
-    conn = sqlite3.connect("trade_logs.db")
+    conn = psycopg2.connect(
+        host="bottoei-bottoei.e.aivencloud.com",
+        port=13006,
+        dbname="defaultdb",
+        user="avnadmin",
+        password="AVNS_oPaFDXYBP38oGD4KIm2",
+        sslmode="require"
+    )
     cursor = conn.cursor()
+    # Create the table if it does not exist
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS cancel_order_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             symbol TEXT,
             order_id TEXT,
             side TEXT,
             status TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    # Insert the log record
     cursor.execute(
-        "INSERT INTO cancel_order_logs (symbol, order_id, side, status) VALUES (?, ?, ?, ?)",
+        "INSERT INTO cancel_order_logs (symbol, order_id, side, status) VALUES (%s, %s, %s, %s)",
         (symbol, order_id, side, status)
     )
+
+    # Commit the transaction and close the connection
     conn.commit()
+    cursor.close()
     conn.close()
+
     
 def save_trade_record(symbol, order_type, profit_loss):
     """
     บันทึกข้อมูลกำไร/ขาดทุนลงในตาราง trade_records
     """
-    conn = sqlite3.connect("trade_logs.db")
+    conn = psycopg2.connect(
+        host="bottoei-bottoei.e.aivencloud.com",
+        port=13006,
+        dbname="defaultdb",
+        user="avnadmin",
+        password="AVNS_oPaFDXYBP38oGD4KIm2",
+        sslmode="require"
+    )
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS trade_records (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             symbol TEXT,
             order_type TEXT,
             profit_loss REAL,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
     cursor.execute(
         """
         INSERT INTO trade_records (symbol, order_type, profit_loss)
-        VALUES (?, ?, ?)
+        VALUES (%s, %s, %s)
         """,
         (symbol, order_type, profit_loss)
     )
@@ -454,11 +549,18 @@ def save_rebalance_log_to_db(timestamp, asset, transaction_type, amount, price, 
     """
     บันทึก Log ของ Rebalance ลง SQLite
     """
-    conn = sqlite3.connect("trade_logs.db")
+    conn = psycopg2.connect(
+        host="bottoei-bottoei.e.aivencloud.com",
+        port=13006,
+        dbname="defaultdb",
+        user="avnadmin",
+        password="AVNS_oPaFDXYBP38oGD4KIm2",
+        sslmode="require"
+    )
     cursor = conn.cursor()
     cursor.execute("""
         INSERT INTO rebalance_logs (timestamp, asset, type, amount, price, potential_profit)
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s)
     """, (timestamp, asset, transaction_type, amount, price, potential_profit))
     conn.commit()
     conn.close()
@@ -468,7 +570,14 @@ def calculate_overall_profit_loss():
     """
     คำนวณกำไร/ขาดทุนรวมจากตาราง trade_records
     """
-    conn = sqlite3.connect("trade_logs.db")
+    conn = psycopg2.connect(
+        host="bottoei-bottoei.e.aivencloud.com",
+        port=13006,
+        dbname="defaultdb",
+        user="avnadmin",
+        password="AVNS_oPaFDXYBP38oGD4KIm2",
+        sslmode="require"
+    )
     cursor = conn.cursor()
     cursor.execute("""
         SELECT SUM(profit_loss) FROM trade_records
@@ -855,23 +964,39 @@ def calculate_overall_profit_loss():
     """
     คำนวณกำไร/ขาดทุนรวมจากตาราง trade_records
     """
-    conn = sqlite3.connect("trade_logs.db")
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT SUM(profit_loss) FROM trade_records
-    """)
-    result = cursor.fetchone()
-    conn.close()
-    return result[0] if result and result[0] is not None else 0.0
+    try:
+        conn = psycopg2.connect(
+        host="bottoei-bottoei.e.aivencloud.com",
+        port=13006,
+        dbname="defaultdb",
+        user="avnadmin",
+        password="AVNS_oPaFDXYBP38oGD4KIm2",
+        sslmode="require"
+    )
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT SUM(profit_loss) FROM trade_records
+        """)
+        result = cursor.fetchone()
+        conn.close()
+        return result[0] if result and result[0] is not None else 0.0
+    except Exception as e:
+        # จัดการข้อผิดพลาดอื่น ๆ
+        print(f"An error occurred: {e}")
+        return 0.0
 
 def get_trade_records():
     """
-    ดึงประวัติการบันทึกกำไร/ขาดทุนจาก trade_records
+    Fetch trade records from the `trade_records` table using SQLAlchemy.
     """
-    conn = sqlite3.connect("trade_logs.db")
-    df_records = pd.read_sql_query("SELECT * FROM trade_records ORDER BY timestamp DESC", conn)
-    conn.close()
-    return df_records
+    query = "SELECT * FROM trade_records ORDER BY timestamp DESC"
+    try:
+        # Use SQLAlchemy engine with pandas
+        df_records = pd.read_sql(query, engine)
+        return df_records
+    except Exception as e:
+        print(f"Error fetching trade records: {e}")
+        return pd.DataFrame()  # Return an empty DataFrame on error
 
 def calculate_profit(asset, balance, current_price, buy_price):
     """คำนวณกำไรที่เป็นไปได้"""
@@ -950,7 +1075,14 @@ def fetch_open_orders():
         
 # ฟังก์ชันดึงข้อมูลจาก SQLite
 def fetch_trading_logs():
-    conn = sqlite3.connect("trade_logs.db")
+    conn = psycopg2.connect(
+        host="bottoei-bottoei.e.aivencloud.com",
+        port=13006,
+        dbname="defaultdb",
+        user="avnadmin",
+        password="AVNS_oPaFDXYBP38oGD4KIm2",
+        sslmode="require"
+    )
     cursor = conn.cursor()
     cursor.execute("SELECT id, symbol, message, timestamp FROM logs ORDER BY timestamp DESC")
     rows = cursor.fetchall()
@@ -958,7 +1090,14 @@ def fetch_trading_logs():
     return pd.DataFrame(rows, columns=["ID", "Symbol", "Message", "Timestamp"])
 
 def fetch_order_logs():
-    conn = sqlite3.connect("trade_logs.db")
+    conn = psycopg2.connect(
+        host="bottoei-bottoei.e.aivencloud.com",
+        port=13006,
+        dbname="defaultdb",
+        user="avnadmin",
+        password="AVNS_oPaFDXYBP38oGD4KIm2",
+        sslmode="require"
+    )
     cursor = conn.cursor()
     cursor.execute("SELECT id, symbol, order_type, amount, rate, status, timestamp FROM order_logs ORDER BY timestamp DESC")
     rows = cursor.fetchall()
@@ -966,7 +1105,14 @@ def fetch_order_logs():
     return pd.DataFrame(rows, columns=["ID", "Symbol", "Order Type", "Amount", "Rate", "Status", "Timestamp"])
 
 def fetch_cancel_order_logs():
-    conn = sqlite3.connect("trade_logs.db")
+    conn = psycopg2.connect(
+        host="bottoei-bottoei.e.aivencloud.com",
+        port=13006,
+        dbname="defaultdb",
+        user="avnadmin",
+        password="AVNS_oPaFDXYBP38oGD4KIm2",
+        sslmode="require"
+    )
     cursor = conn.cursor()
     cursor.execute("SELECT id, symbol, order_id, side, status, timestamp FROM cancel_order_logs ORDER BY timestamp DESC")
     rows = cursor.fetchall()
@@ -985,16 +1131,20 @@ def fetch_assets():
         return df
     else:
         return pd.DataFrame(columns=["Asset", "Balance"])
-
+    
 def fetch_rebalance_logs():
     """
-    ดึง Log ของ Rebalance จาก SQLite
+    Fetch Rebalance Logs using SQLAlchemy and pandas.
     """
-    conn = sqlite3.connect("trade_logs.db")
-    df = pd.read_sql_query("SELECT * FROM rebalance_logs ORDER BY timestamp DESC", conn)
-    conn.close()
-    return df
-    
+    query = "SELECT * FROM rebalance_logs ORDER BY timestamp DESC"
+    try:
+        # Use SQLAlchemy engine with pandas
+        df = pd.read_sql(query, engine)
+        return df
+    except Exception as e:
+        print(f"Error fetching rebalance logs: {e}")
+        return pd.DataFrame()  # Return an empty DataFrame if there's an error
+
 # ฟังก์ชันแสดงรายการทรัพย์สิน
 def display_assets_with_profit():
     st.subheader("Asset and Profit Overview")
@@ -1093,7 +1243,7 @@ def display_overall():
 
         
         
-
+initialize_database()
 # เพิ่ม placeholder สำหรับรีเฟรชข้อมูล
 refresh_placeholder = st.empty()
 
